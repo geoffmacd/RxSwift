@@ -342,6 +342,77 @@ extension ObservableWithLatestFromTest {
             Subscription(200, 400)
             ])
     }
+    
+    func testWithLatestFrom_DeferredSecond() {
+        let scheduler = TestScheduler(initialClock: 0)
+        
+        let xs = scheduler.createHotObservable([
+            .next(90, 1),
+            .next(180, 2),
+            .next(250, 3),
+            .completed(590)
+        ])
+        
+        // no event until after `xs` emits
+        let ys = scheduler.createHotObservable([
+            .next(255, "bar"),
+            .next(330, "foo"),
+            .next(350, "qux"),
+            .completed(400)
+        ])
+        
+        let res = scheduler.start {
+            xs.withLatestFrom(ys, behavior: .deferred) { x, y in "\(x)\(y)" }
+        }
+        
+        XCTAssertEqual(res.events, [
+            .next(255, "3bar"),
+            .completed(590)
+        ])
+        
+        XCTAssertEqual(xs.subscriptions, [
+            Subscription(200, 590)
+        ])
+        
+        XCTAssertEqual(ys.subscriptions, [
+            Subscription(200, 400)
+        ])
+    }
+    
+    func testWithLatestFrom_DeferredError() {
+        let scheduler = TestScheduler(initialClock: 0)
+        
+        let xs = scheduler.createHotObservable([
+            .next(90, 1),
+            .next(180, 2),
+            .next(250, 3),
+            .error(590, testError)
+        ])
+        
+        let ys = scheduler.createHotObservable([
+            .next(255, "bar"),
+            .next(330, "foo"),
+            .next(350, "qux"),
+            .completed(400)
+        ])
+        
+        let res = scheduler.start {
+            xs.withLatestFrom(ys, behavior: .deferred) { x, y in "\(x)\(y)" }
+        }
+        
+        XCTAssertEqual(res.events, [
+            .next(255, "3bar"),
+            .error(590, testError)
+        ])
+        
+        XCTAssertEqual(xs.subscriptions, [
+            Subscription(200, 590)
+        ])
+        
+        XCTAssertEqual(ys.subscriptions, [
+            Subscription(200, 400)
+        ])
+    }
 
     #if TRACE_RESOURCES
         func testWithLatestFromReleasesResourcesOnComplete1() {
